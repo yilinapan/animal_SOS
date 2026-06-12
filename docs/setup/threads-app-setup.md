@@ -59,6 +59,26 @@ GitHub repo → Settings → Secrets and variables → Actions → New repositor
 
 GitHub repo → Actions → `threads-monitor` → **Run workflow**（選這個分支）→ 跑完後看 `pipeline/digests/` 是否出現當日摘要。
 
+## ⚠️ keyword_search 的權限分級（2026-06-12 實測確認）
+
+開發模式（Standard Access）下 `keyword_search` **只能搜到 tester 自己帳號發的貼文**——
+搜全站公開貼文需要 **Advanced Access**，必須通過 Meta App Review。
+（這是 2026-06-12 第一次實跑 workflow 得到 code 10 錯誤的原因。）
+
+App Review 需要準備：
+
+1. **隱私政策網址**（必要）：可用 GitHub Pages 靜態頁
+2. **使用條款網址**（必要）：同上
+3. **螢幕錄影**：示範 app 如何使用 keyword_search（開發模式下對自己帳號的貼文操作即可示範）
+4. **用途說明**：例「監測 Threads 上的動物救援求助貼文，自動分類後提供正確的官方通報資訊」
+5. **商家驗證**：Meta「可能」要求（提交後才會明確通知）。沒有公司行號時可嘗試管理員身分驗證（Admin/Individual Verification），不行再說。
+
+時程預期（社群經驗）：審查 2–6 週、商家驗證另加 1–2 週、第一次被退件很常見。
+
+**審查通過前的替代方案**：手動收件匣 `pipeline/inbox.md`——滑 Threads 看到求助文，
+把連結＋內文貼進去 commit，workflow 會自動分類進每日摘要。
+可在 repo Settings → Variables 設 `THREADS_SEARCH_ENABLED=false` 停用注定失敗的搜尋。
+
 ## 注意事項
 
 - **token 60 天到期**：到期前用 `https://graph.threads.net/v1.0/refresh_access_token?grant_type=th_refresh_token&access_token=<舊TOKEN>` 換新，再更新 Secret。

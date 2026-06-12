@@ -1,11 +1,16 @@
-# Threads 監測管線：搜尋求助貼文 → AI 分類 → 產出每日摘要 → commit 回 repo
+# Threads 監測管線：收件匣/搜尋求助貼文 → AI 分類 → 產出每日摘要 → commit 回 repo
 #
-# 注意：schedule 觸發只在「預設分支」上生效。在合併進預設分支之前，
-# 請用 Actions 頁面的 Run workflow（workflow_dispatch）手動指定分支執行。
+# 觸發方式：
+#   1. 排程（只在預設分支生效）
+#   2. 手動 Run workflow
+#   3. push 修改 pipeline/inbox.md（手動收件匣：貼連結 → commit → 自動分類）
 #
 # 需要的 Secrets（repo Settings → Secrets and variables → Actions）：
 #   THREADS_ACCESS_TOKEN  Threads 長效 token（60 天效期，見 docs/setup/threads-app-setup.md）
 #   ANTHROPIC_API_KEY     Anthropic API key
+# 選用的 Variables：
+#   THREADS_SEARCH_ENABLED  設成 false 可停用 keyword search
+#   （keyword_search 搜「公開貼文」需通過 App Review；通過前只搜得到自己帳號的貼文）
 name: threads-monitor
 
 on:
@@ -13,6 +18,9 @@ on:
     - cron: "0 1 * * *"   # 09:00 台北時間
     - cron: "0 9 * * *"   # 17:00 台北時間
   workflow_dispatch: {}
+  push:
+    branches: [main]
+    paths: ["pipeline/inbox.md"]
 
 permissions:
   contents: write
@@ -47,16 +55,20 @@ jobs:
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          THREADS_SEARCH_ENABLED: ${{ vars.THREADS_SEARCH_ENABLED || 'true' }}
         run: npm run monitor
 
       - name: Commit results
         run: |
           git config user.name "animal-sos-bot"
           git config user.email "actions@github.com"
-          git add pipeline/data pipeline/digests
+          git add pipeline/data pipeline/digests pipeline/inbox.md
           if git diff --cached --quiet; then
             echo "沒有新資料，跳過 commit"
           else
-            git commit -m "monitor: $(TZ=Asia/Taipei date +%F\ %H:%M) 監測結果"
+            # [skip ci] 避免清空 inbox.md 的 commit 再次觸發本 workflow
+            git commit -m "monitor: $(TZ=Asia/Taipei date +%F\ %H:%M) 監測結果 [skip ci]"
+            # 收件匣觸發時可能與其他 push 競爭，先 rebase 再推
+            git pull --rebase origin "${GITHUB_REF_NAME}" || true
             git push
           fi

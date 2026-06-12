@@ -1,4 +1,15 @@
-# Animal SOS — 現階段決策與待辦（2026-06-11）
+# Animal SOS — 現階段決策與待辦（2026-06-11，06-12 更新）
+
+## ⚠️ 2026-06-12 重要更新：keyword_search 需要 App Review
+
+第一次實跑 workflow 發現：**`keyword_search` 在開發模式只能搜到自己 tester 帳號的貼文**；要搜全站公開貼文必須通過 Meta App Review 取得 Advanced Access（可能要求商家驗證）。社群經驗：審查 2–6 週、商家驗證另加 1–2 週、首次退件常見。
+
+影響與對策：
+- **發文/回覆不受影響**：`threads_content_publish`、`threads_manage_replies` 是用自己帳號發內容，開發模式即可用——產品核心互動不被卡。
+- **P0 驗證改雙軌**：
+  - 短期：手動收件匣（`pipeline/inbox.md`）——滑到求助文貼連結＋內文 → commit → 自動分類進每日摘要。
+  - 並行：準備 App Review 材料提交（隱私政策頁、使用條款頁、螢幕錄影示範 keyword_search 用途）。商家驗證是否必要，提交後 Meta 才會明確要求，先提交探路。
+- 決策 2「零 Meta 審核」修正為：**驗證期零審核可行（靠收件匣），規模化搜尋需要審查**。
 
 ## 已定案的決策
 
