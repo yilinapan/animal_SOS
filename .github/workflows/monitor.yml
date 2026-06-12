@@ -1,0 +1,62 @@
+# Threads 監測管線：搜尋求助貼文 → AI 分類 → 產出每日摘要 → commit 回 repo
+#
+# 注意：schedule 觸發只在「預設分支」上生效。在合併進預設分支之前，
+# 請用 Actions 頁面的 Run workflow（workflow_dispatch）手動指定分支執行。
+#
+# 需要的 Secrets（repo Settings → Secrets and variables → Actions）：
+#   THREADS_ACCESS_TOKEN  Threads 長效 token（60 天效期，見 docs/setup/threads-app-setup.md）
+#   ANTHROPIC_API_KEY     Anthropic API key
+name: threads-monitor
+
+on:
+  schedule:
+    - cron: "0 1 * * *"   # 09:00 台北時間
+    - cron: "0 9 * * *"   # 17:00 台北時間
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: threads-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check secrets
+        run: |
+          if [ -z "${{ secrets.THREADS_ACCESS_TOKEN }}" ] || [ -z "${{ secrets.ANTHROPIC_API_KEY }}" ]; then
+            echo "::error::缺少 THREADS_ACCESS_TOKEN 或 ANTHROPIC_API_KEY，請到 repo Settings → Secrets 設定"
+            exit 1
+          fi
+
+      - name: Install
+        working-directory: pipeline
+        run: npm install
+
+      - name: Run monitor
+        working-directory: pipeline
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: npm run monitor
+
+      - name: Commit results
+        run: |
+          git config user.name "animal-sos-bot"
+          git config user.email "actions@github.com"
+          git add pipeline/data pipeline/digests
+          if git diff --cached --quiet; then
+            echo "沒有新資料，跳過 commit"
+          else
+            git commit -m "monitor: $(TZ=Asia/Taipei date +%F\ %H:%M) 監測結果"
+            git push
+          fi
