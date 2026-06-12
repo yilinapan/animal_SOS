@@ -8,26 +8,38 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 const MANUAL_MARKER = "<!-- 人工紀錄區：此行以下不會被自動覆蓋 -->";
 
-const MANUAL_TEMPLATE = `## 人工檢查紀錄（驗證期指標）
+/** 為每篇新求助文插入一行待填欄位（已存在的行不重複新增）。 */
+function buildManualTemplate(help: LoggedPost[], existing: string): string {
+  const lines = existing ? existing.split("\n") : [];
+  const header = lines.length
+    ? existing
+    : `## 人工檢查紀錄（驗證期指標）\n\n缺口 = 發文後 2 小時內有沒有人給出可行動的正確資訊\n回覆品質：沒人理 / 錯誤建議 / 部分正確 / 完整正確\n`;
 
-每篇求助文記三件事：缺口（2小時內有無正確資訊）、回覆品質（沒人理/錯誤/部分正確/完整正確）、有無手動回覆與原po反應。
+  const toAdd = help
+    .filter((e) => {
+      const id = e.post.id;
+      return !existing.includes(id);
+    })
+    .map((e) => {
+      const username = e.post.username ? `@${e.post.username}` : e.post.id;
+      const link = e.post.permalink ? ` [→](${e.post.permalink})` : "";
+      return `- [ ] ${username}${link}（${e.classification.case_type}｜${e.classification.region ?? "地區不明"}）：缺口？　回覆品質？　手動回覆？ <!-- id:${e.post.id} -->`;
+    });
 
-- [ ] （範例）@帳號：無缺口，回覆品質完整正確，未手動回覆
-`;
+  if (!toAdd.length) return header;
+  return header.trimEnd() + "\n\n" + toAdd.join("\n") + "\n";
+}
 
 export function writeDigest(dayPosts: LoggedPost[], quotaLeft: number): string {
   const date = taipeiDate();
   const path = join(ROOT, "digests", `${date}.md`);
 
   // 保留既有檔案中分隔線以下的人工紀錄
-  let manualSection = MANUAL_TEMPLATE;
+  let existingManual = "";
   if (existsSync(path)) {
-    const existing = readFileSync(path, "utf8");
-    const idx = existing.indexOf(MANUAL_MARKER);
-    if (idx !== -1) {
-      const tail = existing.slice(idx + MANUAL_MARKER.length).trim();
-      if (tail) manualSection = tail;
-    }
+    const raw = readFileSync(path, "utf8");
+    const idx = raw.indexOf(MANUAL_MARKER);
+    if (idx !== -1) existingManual = raw.slice(idx + MANUAL_MARKER.length).trim();
   }
 
   const help = dayPosts.filter((e) => e.classification.is_help_post);
@@ -63,6 +75,7 @@ export function writeDigest(dayPosts: LoggedPost[], quotaLeft: number): string {
     );
   }
 
+  const manualSection = buildManualTemplate(help, existingManual);
   lines.push("", MANUAL_MARKER, "", manualSection, "");
 
   mkdirSync(dirname(path), { recursive: true });
